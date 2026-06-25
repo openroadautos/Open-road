@@ -63,17 +63,29 @@ if (counterEls.length) {
 const pills = document.querySelectorAll('.filter-pill');
 const cards = document.querySelectorAll('.vehicle-card[data-category]');
 if (pills.length && cards.length) {
+  const params = new URLSearchParams(window.location.search);
+  const initialFilter = params.get('category');
+
+  function applyInventoryFilter(cat) {
+    pills.forEach(p => p.classList.toggle('active', p.dataset.filter === cat));
+    cards.forEach(card => {
+      const show = cat === 'all' || card.dataset.category === cat;
+      card.style.display = show ? '' : 'none';
+    });
+  }
+
   pills.forEach(pill => {
     pill.addEventListener('click', () => {
-      pills.forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
       const cat = pill.dataset.filter;
-      cards.forEach(card => {
-        const show = cat === 'all' || card.dataset.category === cat;
-        card.style.display = show ? '' : 'none';
-      });
+      applyInventoryFilter(cat);
+      const url = cat === 'all' ? window.location.pathname : `${window.location.pathname}?category=${cat}`;
+      window.history.replaceState({}, '', url);
     });
   });
+
+  if (initialFilter && [...pills].some(p => p.dataset.filter === initialFilter)) {
+    applyInventoryFilter(initialFilter);
+  }
 }
 
 // ── Form: prevent default, show success ──
