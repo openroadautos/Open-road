@@ -1,6 +1,4 @@
 window.OPENROAD_SUPABASE = {
-  // Fill these from Supabase Project Settings -> API.
-  // The anon key is safe to publish when Row Level Security is enabled.
-  url: "",
-  anonKey: "",
+  url: "https://crvjjelciasiygjoplmj.supabase.co",
+  anonKey: "sb_publishable_IOK8GoHoInSupo_Z0gs2Fg_1qlmOv0U",
 };
