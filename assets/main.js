@@ -60,21 +60,24 @@ if (counterEls.length) {
 }
 
 // ── Inventory filter pills ──
-const pills = document.querySelectorAll('.filter-pill');
-const cards = document.querySelectorAll('.vehicle-card[data-category]');
-if (pills.length && cards.length) {
+function bindInventoryFilters() {
+  const pills = document.querySelectorAll('.filter-pill');
+  const cards = () => document.querySelectorAll('.vehicle-card[data-category]');
+  if (!pills.length || !cards().length) return;
   const params = new URLSearchParams(window.location.search);
-  const initialFilter = params.get('category');
+  const initialFilter = params.get('category') || 'all';
 
   function applyInventoryFilter(cat) {
     pills.forEach(p => p.classList.toggle('active', p.dataset.filter === cat));
-    cards.forEach(card => {
+    cards().forEach(card => {
       const show = cat === 'all' || card.dataset.category === cat;
       card.style.display = show ? '' : 'none';
     });
   }
 
   pills.forEach(pill => {
+    if (pill.dataset.bound === 'true') return;
+    pill.dataset.bound = 'true';
     pill.addEventListener('click', () => {
       const cat = pill.dataset.filter;
       applyInventoryFilter(cat);
@@ -83,10 +86,12 @@ if (pills.length && cards.length) {
     });
   });
 
-  if (initialFilter && [...pills].some(p => p.dataset.filter === initialFilter)) {
+  if ([...pills].some(p => p.dataset.filter === initialFilter)) {
     applyInventoryFilter(initialFilter);
   }
 }
+bindInventoryFilters();
+window.addEventListener('openroad:inventory-rendered', bindInventoryFilters);
 
 // ── Form: prevent default, show success ──
 document.querySelectorAll('form[data-ajax]').forEach(form => {
