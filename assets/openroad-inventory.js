@@ -43,7 +43,7 @@
     return `
       <article class="vehicle-card reveal visible${delay}" data-category="${category}">
         <a href="${href}">
-          <div class="vc-img"><img src="${imageFor(v)}" alt="${titleFor(v)}" loading="lazy"></div>
+          <div class="vc-img"><span class="vc-fee-sticker">Zero Fees</span><img src="${imageFor(v)}" alt="${titleFor(v)}" loading="lazy"></div>
           <div class="vc-body">
             <div class="vc-make">${escapeHtml(v.make || "")}</div>
             <div class="vc-name">${escapeHtml(v.model || "")}<br><small style="font-size:1rem;opacity:.6">${escapeHtml(`${v.year || ""} · ${v.trim || v.body_type || ""}`)}</small></div>
@@ -167,7 +167,22 @@
       return;
     }
 
-    await renderAdminDashboard(sb);
+    try {
+      await renderAdminDashboard(sb);
+    } catch (error) {
+      adminRoot.innerHTML = `
+        <div class="admin-card">
+          <span class="eyebrow">Admin Error</span>
+          <h1>Inventory could not load.</h1>
+          <p>${escapeHtml(error.message || "Check Supabase tables and permissions, then refresh.")}</p>
+          <button class="btn btn-outline" data-admin-signout>Sign Out</button>
+        </div>
+      `;
+      document.querySelector("[data-admin-signout]")?.addEventListener("click", async () => {
+        await sb.auth.signOut();
+        await renderAdmin();
+      });
+    }
   }
 
   function setupMessage() {
@@ -227,6 +242,7 @@
             <div class="admin-section-head">
               <h2>${vehicles.length} vehicles</h2>
               <p>Add, delete, or mark sold. Public inventory updates from Supabase.</p>
+              ${vehicles.length ? "" : `<button class="btn btn-gold" type="button" data-admin-import>Import Website Inventory</button>`}
             </div>
             <div class="admin-table">${vehicles.map(adminRow).join("") || "<p>No vehicles yet.</p>"}</div>
           </section>
@@ -340,6 +356,20 @@
       await renderAdminDashboard(sb);
     });
 
+    document.querySelector("[data-admin-import]")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.textContent = "Importing...";
+      button.disabled = true;
+      try {
+        const imported = await importWebsiteInventory(sb);
+        button.textContent = `Imported ${imported} vehicles`;
+        await renderAdminDashboard(sb);
+      } catch (error) {
+        button.textContent = error.message || "Import failed";
+        button.disabled = false;
+      }
+    });
+
     document.querySelectorAll("[data-admin-delete]").forEach((button) => {
       button.addEventListener("click", async () => {
         if (!confirm("Delete this vehicle from inventory?")) return;
@@ -358,6 +388,73 @@
         await renderAdminDashboard(sb);
       });
     });
+  }
+
+  async function importWebsiteInventory(sb) {
+    const vehicles = await readWebsiteInventory();
+    if (!vehicles.length) throw new Error("No website inventory found.");
+
+    const vehicleRows = vehicles.map(({ image, ...vehicle }) => vehicle);
+    const { data, error } = await sb
+      .from("openroad_vehicles")
+      .upsert(vehicleRows, { onConflict: "stock_number" })
+      .select("id, stock_number");
+    if (error) throw error;
+
+    const imported = data || [];
+    const ids = imported.map((v) => v.id);
+    if (ids.length) {
+      await sb.from("openroad_vehicle_images").delete().in("vehicle_id", ids);
+    }
+
+    const byStock = new Map(imported.map((v) => [v.stock_number, v.id]));
+    const imageRows = vehicles
+      .filter((v) => v.image && byStock.has(v.stock_number))
+      .map((v) => ({
+        vehicle_id: byStock.get(v.stock_number),
+        url: v.image,
+        sort_order: 0,
+        is_primary: true,
+      }));
+
+    if (imageRows.length) {
+      const { error: imageError } = await sb.from("openroad_vehicle_images").insert(imageRows);
+      if (imageError) throw imageError;
+    }
+
+    return imported.length;
+  }
+
+  async function readWebsiteInventory() {
+    const response = await fetch("/inventory/");
+    if (!response.ok) throw new Error("Could not read website inventory.");
+    const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+    return [...doc.querySelectorAll("[data-openroad-inventory-grid] .vehicle-card")].map((card) => {
+      const href = card.querySelector("a")?.getAttribute("href") || "";
+      const stock = href.split("/").filter(Boolean).pop()?.replace(/\.html$/, "") || "";
+      const make = card.querySelector(".vc-make")?.textContent.trim() || "";
+      const nameEl = card.querySelector(".vc-name");
+      const model = nameEl?.childNodes[0]?.textContent.trim() || "";
+      const yearTrim = nameEl?.querySelector("small")?.textContent.split("·").map((s) => s.trim()) || [];
+      const specs = [...card.querySelectorAll(".vc-spec")].map((s) => s.textContent.trim());
+      const price = Number((card.querySelector(".vc-price strong")?.textContent || "").replace(/[^\d]/g, ""));
+      const imagePath = card.querySelector(".vc-img img")?.getAttribute("src") || "";
+      return {
+        stock_number: stock,
+        year: Number(yearTrim[0]) || new Date().getFullYear(),
+        make,
+        model,
+        trim: yearTrim[1] || null,
+        price: Number.isFinite(price) ? price : 0,
+        mileage: Number((specs[0] || "").replace(/[^\d]/g, "")) || 0,
+        body_type: card.dataset.category || "suv",
+        transmission: specs[1] || "Automatic",
+        fuel_type: specs[2] || "Gasoline",
+        description: "Contact OpenRoad Auto Group for details on this vehicle.",
+        status: "available",
+        image: imagePath ? new URL(imagePath, window.location.origin).href : "",
+      };
+    }).filter((v) => v.stock_number && v.make && v.model);
   }
 
   document.addEventListener("DOMContentLoaded", () => {

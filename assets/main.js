@@ -107,8 +107,16 @@ window.addEventListener('openroad:inventory-rendered', bindInventoryFilters);
 // ── Zero-fee inventory language ──
 function updateInventoryFeeCopy() {
   document.querySelectorAll('.vehicle-card .vc-price span').forEach(label => {
-    if (label.textContent.trim().toLowerCase() === 'plus taxes & fees') {
+    if (label.textContent.trim().toLowerCase().includes('fees')) {
       label.textContent = 'plus taxes only';
+    }
+  });
+  document.querySelectorAll('.vehicle-card .vc-img').forEach(imageWrap => {
+    if (!imageWrap.querySelector('.vc-fee-sticker')) {
+      const sticker = document.createElement('span');
+      sticker.className = 'vc-fee-sticker';
+      sticker.textContent = 'Zero Fees';
+      imageWrap.prepend(sticker);
     }
   });
 }
