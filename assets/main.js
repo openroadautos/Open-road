@@ -16,6 +16,17 @@ if (burger && navLinks) {
   });
 }
 
+// ── Footer admin link ──
+const footerBottom = document.querySelector('.footer .footer-bottom');
+if (footerBottom && !footerBottom.querySelector('[data-admin-link]')) {
+  const adminLink = document.createElement('a');
+  adminLink.href = '/admin/';
+  adminLink.className = 'footer-admin-link';
+  adminLink.dataset.adminLink = 'true';
+  adminLink.textContent = 'Admin Portal';
+  footerBottom.appendChild(adminLink);
+}
+
 // ── Hero bg parallax (subtle) ──
 const heroBg = document.querySelector('.hero-bg');
 if (heroBg) {
@@ -92,6 +103,17 @@ function bindInventoryFilters() {
 }
 bindInventoryFilters();
 window.addEventListener('openroad:inventory-rendered', bindInventoryFilters);
+
+// ── Zero-fee inventory language ──
+function updateInventoryFeeCopy() {
+  document.querySelectorAll('.vehicle-card .vc-price span').forEach(label => {
+    if (label.textContent.trim().toLowerCase() === 'plus taxes & fees') {
+      label.textContent = 'plus taxes only';
+    }
+  });
+}
+updateInventoryFeeCopy();
+window.addEventListener('openroad:inventory-rendered', updateInventoryFeeCopy);
 
 // ── Form: prevent default, show success ──
 document.querySelectorAll('form[data-ajax]').forEach(form => {

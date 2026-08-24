@@ -52,7 +52,7 @@
               <span class="vc-spec">${escapeHtml(v.transmission || "Automatic")}</span>
               <span class="vc-spec">${escapeHtml(v.fuel_type || "Gasoline")}</span>
             </div>
-            <div class="vc-price"><strong>${money.format(Number(v.price || 0))}</strong><span>plus taxes & fees</span></div>
+            <div class="vc-price"><strong>${money.format(Number(v.price || 0))}</strong><span>plus taxes only</span></div>
             <div class="vc-cta"><span class="btn btn-gold" style="flex:1;font-size:.72rem">View Details</span></div>
           </div>
         </a>
