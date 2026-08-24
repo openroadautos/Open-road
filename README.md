@@ -14,14 +14,14 @@ It lets authenticated staff:
 - Add vehicles
 - Delete vehicles
 - Mark vehicles sold/available
-- Add photo URLs for each car
+- Upload local vehicle pictures, with optional photo URLs as a backup
 
 The public inventory page at `/inventory/` loads cars from Supabase when configured. If Supabase is not configured yet, the existing static HTML inventory remains visible as a fallback.
 
 ## Supabase Setup
 
 1. Create a Supabase project.
-2. Run `supabase/openroad_admin.sql` in the Supabase SQL editor.
+2. Run `supabase/openroad_admin.sql` in the Supabase SQL editor. This creates the inventory tables and the public `openroad-vehicle-images` Storage bucket used for manual picture uploads.
 3. Run `supabase/openroad_seed_current_inventory.sql` to import the current static cars.
 4. Create an admin user in Supabase Auth.
 5. Fill `/assets/openroad-config.js` with:

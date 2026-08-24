@@ -4,6 +4,7 @@
   const grid = document.querySelector("[data-openroad-inventory-grid]");
   const detailRoot = document.querySelector("[data-openroad-vehicle-detail]");
   const adminRoot = document.querySelector("[data-openroad-admin]");
+  const IMAGE_BUCKET = "openroad-vehicle-images";
 
   const money = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -282,7 +283,8 @@
           <label>Fuel<input name="fuel_type" value="Gasoline"></label>
         </div>
         <label>Description<textarea name="description" rows="4"></textarea></label>
-        <label>Photo URLs, one per line<textarea name="images" rows="5" placeholder="https://..."></textarea></label>
+        <label>Upload Pictures<input name="image_files" type="file" accept="image/*" multiple></label>
+        <label>Photo URLs, optional backup<textarea name="images" rows="3" placeholder="https://..."></textarea></label>
         <button class="btn btn-gold" type="submit">Add Vehicle</button>
         <p data-admin-form-status class="admin-status"></p>
       </form>
@@ -330,16 +332,31 @@
       };
 
       const status = form.querySelector("[data-admin-form-status]");
-      status.textContent = "Saving...";
+      status.textContent = "Saving vehicle...";
       const { data, error } = await sb.from("openroad_vehicles").insert(vehicle).select("id").single();
       if (error) {
         status.textContent = error.message;
         return;
       }
 
+      const files = [...(form.querySelector('[name="image_files"]')?.files || [])];
+      let uploadedUrls = [];
+      if (files.length) {
+        status.textContent = `Uploading ${files.length} picture${files.length === 1 ? "" : "s"}...`;
+        try {
+          uploadedUrls = await uploadVehicleImages(sb, data.id, files);
+        } catch (uploadError) {
+          await sb.from("openroad_vehicles").delete().eq("id", data.id);
+          status.textContent = uploadError.message || "Picture upload failed.";
+          return;
+        }
+      }
+
       const urls = String(fd.get("images") || "").split(/\n+/).map((s) => s.trim()).filter(Boolean);
-      if (urls.length) {
-        const rows = urls.map((url, index) => ({
+      const imageUrls = [...uploadedUrls, ...urls];
+      if (imageUrls.length) {
+        status.textContent = "Saving pictures...";
+        const rows = imageUrls.map((url, index) => ({
           vehicle_id: data.id,
           url,
           sort_order: index,
@@ -388,6 +405,25 @@
         await renderAdminDashboard(sb);
       });
     });
+  }
+
+  async function uploadVehicleImages(sb, vehicleId, files) {
+    const urls = [];
+    for (const [index, file] of files.entries()) {
+      const safeName = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/^-+|-+$/g, "") || `photo-${index + 1}.jpg`;
+      const path = `${vehicleId}/${Date.now()}-${index + 1}-${safeName}`;
+      const { error } = await sb.storage.from(IMAGE_BUCKET).upload(path, file, {
+        cacheControl: "31536000",
+        contentType: file.type || "image/jpeg",
+        upsert: false,
+      });
+      if (error) {
+        throw new Error(`${error.message}. If this is the first upload, run the latest supabase/openroad_admin.sql file in Supabase SQL editor to create the photo storage bucket.`);
+      }
+      const { data } = sb.storage.from(IMAGE_BUCKET).getPublicUrl(path);
+      urls.push(data.publicUrl);
+    }
+    return urls;
   }
 
   async function importWebsiteInventory(sb) {
